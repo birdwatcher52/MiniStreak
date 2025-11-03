@@ -3,7 +3,6 @@ package com.birdwatcher52.ministreak;
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
 
-// 💾 Save/load a few primitive fields via ConfigManager (profile-scoped)
 final class MiniStreakStorage
 {
     private static final String GROUP = "ministreak";
@@ -11,35 +10,41 @@ final class MiniStreakStorage
     @Inject
     private ConfigManager configManager;
 
-    public void save(StreakState s)
+    void save(StreakState s)
     {
         setInt("currentStreak", s.getCurrentStreak());
         setInt("bestStreak", s.getBestStreak());
-        setInt("lifetimeXp", s.getLifetimeXp());
-        setInt("freezeCount", s.getFreezeCount());
-        setStr("lastDoneDateUTC", s.getLastDoneDateUTC());
         setStr("lastSeenDateUTC", s.getLastSeenDateUTC());
+        setStr("lastBirdhouseDateUTC", s.getLastBirdhouseDateUTC());
+        setStr("lastHerbDateUTC", s.getLastHerbDateUTC());
+        setStr("lastCompletionDateUTC", s.getLastCompletionDateUTC());
+        // NEW
+        setStr("lastAnnouncementDateUTC", s.getLastAnnouncementDateUTC());
     }
 
-    public void loadInto(StreakState s)
+    void loadInto(StreakState s)
     {
         s.setCurrentStreak(getInt("currentStreak", 0));
         s.setBestStreak(getInt("bestStreak", 0));
-        s.setLifetimeXp(getInt("lifetimeXp", 0));
-        s.setFreezeCount(getInt("freezeCount", 1)); // kindness default
-        s.setLastDoneDateUTC(getStr("lastDoneDateUTC", ""));
         s.setLastSeenDateUTC(getStr("lastSeenDateUTC", ""));
+        s.setLastBirdhouseDateUTC(getStr("lastBirdhouseDateUTC", ""));
+        s.setLastHerbDateUTC(getStr("lastHerbDateUTC", ""));
+        s.setLastCompletionDateUTC(getStr("lastCompletionDateUTC", ""));
+        // NEW (back-compat default)
+        s.setLastAnnouncementDateUTC(getStr("lastAnnouncementDateUTC", ""));
     }
 
     private void setInt(String key, int v) { configManager.setConfiguration(GROUP, key, v); }
-    private int getInt(String key, int def) {
+    private int getInt(String key, int def)
+    {
         Integer v = configManager.getConfiguration(GROUP, key, Integer.class);
         return v != null ? v : def;
     }
 
     private void setStr(String key, String v) { configManager.setConfiguration(GROUP, key, v); }
-    private String getStr(String key, String def) {
+    private String getStr(String key, String def)
+    {
         String v = configManager.getConfiguration(GROUP, key);
-        return (v != null) ? v : def;
+        return v != null ? v : def;
     }
 }

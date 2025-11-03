@@ -3,46 +3,69 @@ package com.birdwatcher52.ministreak;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 
-// 📦 Single source of truth for streak numbers + dates
 public class StreakState
 {
     private int currentStreak = 0;
     private int bestStreak = 0;
-    private int lifetimeXp = 0;
-    private int freezeCount = 1;
 
-    private String lastDoneDateUTC = ""; // YYYY-MM-DD (UTC)
-    private String lastSeenDateUTC = ""; // tracks day rolls
-    private boolean lastRollUsedFreeze = false; // transient UX hint
+    // UTC date bookkeeping (YYYY-MM-DD)
+    private String lastSeenDateUTC = "";         // last date we observed (for day roll)
+    private String lastBirdhouseDateUTC = "";    // last date birdhouse was set up
+    private String lastHerbDateUTC = "";         // last date herb was planted
+    private String lastCompletionDateUTC = "";   // prevents double-counting once both minis are done
+
+    // NEW: once-per-day Notifier de-dupe
+    private String lastAnnouncementDateUTC = "";
 
     public int getCurrentStreak() { return currentStreak; }
     public int getBestStreak() { return bestStreak; }
-    public int getLifetimeXp() { return lifetimeXp; }
-    public int getFreezeCount() { return freezeCount; }
-    public String getLastDoneDateUTC() { return lastDoneDateUTC; }
+
     public String getLastSeenDateUTC() { return lastSeenDateUTC; }
-    public boolean getLastRollUsedFreeze() { return lastRollUsedFreeze; }
+    public String getLastBirdhouseDateUTC() { return lastBirdhouseDateUTC; }
+    public String getLastHerbDateUTC() { return lastHerbDateUTC; }
+    public String getLastCompletionDateUTC() { return lastCompletionDateUTC; }
+    public String getLastAnnouncementDateUTC() { return lastAnnouncementDateUTC; }
 
-    public void setFreezeCount(int v) { this.freezeCount = Math.max(0, v); }
-    public void setLastDoneDateUTC(String v) { this.lastDoneDateUTC = v != null ? v : ""; }
-    public void setLastSeenDateUTC(String v) { this.lastSeenDateUTC = v != null ? v : ""; }
-    public void setLastRollUsedFreeze(boolean v) { this.lastRollUsedFreeze = v; }
-
-    public void incrementStreakAndMarkToday()
-    {
-        currentStreak++;
-        if (currentStreak > bestStreak) bestStreak = currentStreak;
-        lifetimeXp += 100; // MVP: +100 per mini
-        lastDoneDateUTC = LocalDate.now(ZoneOffset.UTC).toString();
-    }
-
-    public void resetCurrentStreak()
-    {
-        currentStreak = 0;
-    }
-
-    // setters for storage hydrate
     public void setCurrentStreak(int v) { currentStreak = Math.max(0, v); }
-    public void setBestStreak(int v) { bestStreak = Math.max(0, v); }
-    public void setLifetimeXp(int v) { lifetimeXp = Math.max(0, v); }
+    public void setBestStreak(int v) { bestStreak = Math.max(bestStreak, Math.max(0, v)); } // monotonic best
+    public void setLastSeenDateUTC(String v) { lastSeenDateUTC = v != null ? v : ""; }
+    public void setLastBirdhouseDateUTC(String v) { lastBirdhouseDateUTC = v != null ? v : ""; }
+    public void setLastHerbDateUTC(String v) { lastHerbDateUTC = v != null ? v : ""; }
+    public void setLastCompletionDateUTC(String v) { lastCompletionDateUTC = v != null ? v : ""; }
+    public void setLastAnnouncementDateUTC(String v) { lastAnnouncementDateUTC = v != null ? v : ""; }
+
+    public void resetCurrentStreak() { currentStreak = 0; }
+
+    public void markBirdhouseTodayUTC()
+    {
+        lastBirdhouseDateUTC = LocalDate.now(ZoneOffset.UTC).toString();
+    }
+
+    public void markHerbTodayUTC()
+    {
+        lastHerbDateUTC = LocalDate.now(ZoneOffset.UTC).toString();
+    }
+
+    public boolean bothDoneTodayUTC()
+    {
+        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        return today.equals(lastBirdhouseDateUTC) && today.equals(lastHerbDateUTC);
+    }
+
+    public boolean bothDoneOn(String yyyymmdd)
+    {
+        return yyyymmdd.equals(lastBirdhouseDateUTC) && yyyymmdd.equals(lastHerbDateUTC);
+    }
+
+    public boolean birdhouseDoneTodayUTC()
+    {
+        final String today = LocalDate.now(ZoneOffset.UTC).toString();
+        return today.equals(lastBirdhouseDateUTC);
+    }
+
+    public boolean herbDoneTodayUTC()
+    {
+        final String today = LocalDate.now(ZoneOffset.UTC).toString();
+        return today.equals(lastHerbDateUTC);
+    }
 }
