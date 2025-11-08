@@ -35,7 +35,18 @@ import java.util.regex.Pattern;
 @Slf4j
 public final class StreakNameDecorator
 {
+    private static final int CHATBOX_INPUT_COMPONENT_ID = ComponentID.CHATBOX_INPUT;
     private static final int CHATBOX_INPUT_CHILD_ID = ComponentID.CHATBOX_INPUT & 0xFFFF;
+
+    private Widget getChatboxInput()
+    {
+        Widget widget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_COMPONENT_ID);
+        if (widget == null)
+        {
+            widget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_CHILD_ID);
+        }
+        return widget;
+    }
 
     private static final Set<ChatMessageType> DECORATED_TYPES = EnumSet.of(
             ChatMessageType.PUBLICCHAT,
@@ -112,7 +123,7 @@ public final class StreakNameDecorator
         }
 
         // keep input pretty while typing
-        final Widget chatboxInputWidget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_CHILD_ID);
+        final Widget chatboxInputWidget = getChatboxInput();
         if (chatboxInputWidget != null)
         {
             updateChatboxInput(chatboxInputWidget);
@@ -128,7 +139,7 @@ public final class StreakNameDecorator
     {
         if ("setChatboxInput".equals(ev.getEventName()))
         {
-            final Widget chatboxInputWidget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_CHILD_ID);
+            final Widget chatboxInputWidget = getChatboxInput();
             if (chatboxInputWidget != null)
             {
                 updateChatboxInput(chatboxInputWidget);
@@ -227,7 +238,7 @@ public final class StreakNameDecorator
 
     private void tryLearnNativeFromInput()
     {
-        final Widget w = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_CHILD_ID);
+        final Widget w = getChatboxInput();
         if (w == null)
         {
             log.debug("Chatbox input widget is not found while trying to learn native icons.");
