@@ -38,6 +38,8 @@ public final class StreakNameDecorator
     private static final int CHATBOX_INPUT_COMPONENT_ID = ComponentID.CHATBOX_INPUT;
     private static final int CHATBOX_INPUT_CHILD_ID = ComponentID.CHATBOX_INPUT & 0xFFFF;
 
+    private boolean chatboxRefreshQueued = false;
+
     private Widget getChatboxInput()
     {
         Widget widget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_COMPONENT_ID);
@@ -90,6 +92,7 @@ public final class StreakNameDecorator
         nativeIconIdx = -1;
         currentStreak = 0;
         active        = false;
+        chatboxRefreshQueued = false;
     }
 
     public void setCurrentStreak(int v)
@@ -99,6 +102,7 @@ public final class StreakNameDecorator
         if (active)
         {
             clientThread.invoke(() -> client.runScript(net.runelite.api.ScriptID.CHAT_PROMPT_INIT));
+            requestChatboxRefresh();
         }
     }
 
@@ -123,15 +127,7 @@ public final class StreakNameDecorator
         }
 
         // keep input pretty while typing
-        final Widget chatboxInputWidget = getChatboxInput();
-        if (chatboxInputWidget != null)
-        {
-            updateChatboxInput(chatboxInputWidget);
-        }
-        else
-        {
-            log.debug("Chatbox input widget is not found during before render update.");
-        }
+        requestChatboxRefresh();
     }
 
     @Subscribe
@@ -139,15 +135,7 @@ public final class StreakNameDecorator
     {
         if ("setChatboxInput".equals(ev.getEventName()))
         {
-            final Widget chatboxInputWidget = getChatboxInput();
-            if (chatboxInputWidget != null)
-            {
-                updateChatboxInput(chatboxInputWidget);
-            }
-            else
-            {
-                log.debug("Chatbox input widget is not found during script callback update.");
-            }
+            requestChatboxRefresh();
         }
     }
 
@@ -275,6 +263,32 @@ public final class StreakNameDecorator
         maybeFlipActive();
     }
 
+    private void requestChatboxRefresh()
+    {
+        if (chatboxRefreshQueued)
+        {
+            return;
+        }
+
+        chatboxRefreshQueued = true;
+        clientThread.invokeLater(() ->
+        {
+            chatboxRefreshQueued = false;
+
+            final Widget chatboxInputWidget = getChatboxInput();
+            if (chatboxInputWidget == null)
+            {
+                if (active)
+                {
+                    log.debug("Chatbox input widget is not found while scheduling chatbox refresh.");
+                }
+                return;
+            }
+
+            updateChatboxInput(chatboxInputWidget);
+        });
+    }
+
     private void updateChatboxInput(Widget chatboxInputWidget)
     {
         if (!active) return;
@@ -293,15 +307,67 @@ public final class StreakNameDecorator
         if (rsn == null) return;
 
         final String text = chatboxInputWidget.getText();
-        final String[] parts = text.split(":", 2);
-        if (parts.length < 2) return; // nothing typed yet
+        if (text == null || text.isEmpty()) return;
 
-        final String our = "<img=" + modicons.getStreakModIconIdx() + ">";
+        final int colonIndex = text.indexOf(':');
+        if (colonIndex < 0) return;
+
+        final String beforeColon = text.substring(0, colonIndex);
+        final String afterColon = text.substring(colonIndex);
+
+        final String rawName = client.getLocalPlayer().getName();
+        if (rawName == null) return;
+
+        final String plainName = Text.removeTags(rawName);
+        if (plainName == null || plainName.isEmpty()) return;
+
         final String prefix = streakPrefix(currentStreak);
+        final String our = "<img=" + modicons.getStreakModIconIdx() + ">";
         final String maybeNative = config.showNativeIcon() ? nativeChain : "";
 
-        // Canonical order: [#] + OUR + (nativeChain?) + RSN + ":" + typed
-        chatboxInputWidget.setText(prefix + our + maybeNative + Text.removeTags(rsn) + ":" + parts[1]);
+        String remainder = beforeColon;
+        if (!prefix.isEmpty() && remainder.startsWith(prefix))
+        {
+            remainder = remainder.substring(prefix.length());
+        }
+        if (remainder.startsWith(our))
+        {
+            remainder = remainder.substring(our.length());
+        }
+        if (!maybeNative.isEmpty() && remainder.startsWith(maybeNative))
+        {
+            remainder = remainder.substring(maybeNative.length());
+        }
+        else if (!nativeChain.isEmpty() && remainder.startsWith(nativeChain))
+        {
+            // Script wrote the native chain even though we hide it – drop it before rebuilding.
+            remainder = remainder.substring(nativeChain.length());
+        }
+
+        remainder = LEADING_IMGS.matcher(remainder).replaceFirst("");
+        String plainRemainder = Text.removeTags(remainder);
+
+        final String plainPrefix = Text.removeTags(prefix);
+        if (!plainPrefix.isEmpty() && plainRemainder.startsWith(plainPrefix))
+        {
+            plainRemainder = plainRemainder.substring(plainPrefix.length());
+        }
+
+        String nameSuffix = "";
+        if (plainRemainder.startsWith(plainName))
+        {
+            nameSuffix = plainRemainder.substring(plainName.length());
+        }
+
+        final String decoratedName = Text.escapeJagex(plainName) + nameSuffix;
+        final String decorated = prefix + our + maybeNative + decoratedName + afterColon;
+
+        if (decorated.equals(text))
+        {
+            return;
+        }
+
+        chatboxInputWidget.setText(decorated);
     }
 
     private void maybeFlipActive()
@@ -310,6 +376,7 @@ public final class StreakNameDecorator
         {
             active = true;
             client.runScript(net.runelite.api.ScriptID.CHAT_PROMPT_INIT);
+            requestChatboxRefresh();
         }
     }
 
