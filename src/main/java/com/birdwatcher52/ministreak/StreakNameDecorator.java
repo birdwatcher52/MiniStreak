@@ -1,12 +1,15 @@
 package com.birdwatcher52.ministreak;
 
+import lombok.extern.slf4j.Slf4j;
+
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptCallbackEvent;
+import net.runelite.api.widgets.ComponentID;
+import net.runelite.api.widgets.InterfaceID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.Text;
@@ -29,8 +32,22 @@ import java.util.regex.Pattern;
  * is installed (no need to type first).
  */
 @Singleton
+@Slf4j
 public final class StreakNameDecorator
 {
+    private static final int CHATBOX_INPUT_COMPONENT_ID = ComponentID.CHATBOX_INPUT;
+    private static final int CHATBOX_INPUT_CHILD_ID = ComponentID.CHATBOX_INPUT & 0xFFFF;
+
+    private Widget getChatboxInput()
+    {
+        Widget widget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_COMPONENT_ID);
+        if (widget == null)
+        {
+            widget = client.getWidget(InterfaceID.CHATBOX, CHATBOX_INPUT_CHILD_ID);
+        }
+        return widget;
+    }
+
     private static final Set<ChatMessageType> DECORATED_TYPES = EnumSet.of(
             ChatMessageType.PUBLICCHAT,
             ChatMessageType.FRIENDSCHAT,
@@ -106,7 +123,15 @@ public final class StreakNameDecorator
         }
 
         // keep input pretty while typing
-        updateChatboxInput();
+        final Widget chatboxInputWidget = getChatboxInput();
+        if (chatboxInputWidget != null)
+        {
+            updateChatboxInput(chatboxInputWidget);
+        }
+        else
+        {
+            log.debug("Chatbox input widget is not found during before render update.");
+        }
     }
 
     @Subscribe
@@ -114,7 +139,15 @@ public final class StreakNameDecorator
     {
         if ("setChatboxInput".equals(ev.getEventName()))
         {
-            updateChatboxInput();
+            final Widget chatboxInputWidget = getChatboxInput();
+            if (chatboxInputWidget != null)
+            {
+                updateChatboxInput(chatboxInputWidget);
+            }
+            else
+            {
+                log.debug("Chatbox input widget is not found during script callback update.");
+            }
         }
     }
 
@@ -205,8 +238,13 @@ public final class StreakNameDecorator
 
     private void tryLearnNativeFromInput()
     {
-        final Widget w = client.getWidget(WidgetInfo.CHATBOX_INPUT);
-        if (w == null || w.isHidden()) return;
+        final Widget w = getChatboxInput();
+        if (w == null)
+        {
+            log.debug("Chatbox input widget is not found while trying to learn native icons.");
+            return;
+        }
+        if (w.isHidden()) return;
         if (client.getLocalPlayer() == null) return;
 
         final String text = w.getText();
@@ -237,20 +275,24 @@ public final class StreakNameDecorator
         maybeFlipActive();
     }
 
-    private void updateChatboxInput()
+    private void updateChatboxInput(Widget chatboxInputWidget)
     {
         if (!active) return;
         if (modicons.getStreakModIconIdx() < 0) return;
         if (currentStreak < 1) return;
 
-        final Widget w = client.getWidget(WidgetInfo.CHATBOX_INPUT);
-        if (w == null || w.isHidden()) return;
+        if (chatboxInputWidget == null)
+        {
+            log.debug("Chatbox input widget is not found while updating chatbox input.");
+            return;
+        }
+        if (chatboxInputWidget.isHidden()) return;
 
         if (client.getLocalPlayer() == null) return;
         final String rsn = client.getLocalPlayer().getName();
         if (rsn == null) return;
 
-        final String text = w.getText();
+        final String text = chatboxInputWidget.getText();
         final String[] parts = text.split(":", 2);
         if (parts.length < 2) return; // nothing typed yet
 
@@ -259,7 +301,7 @@ public final class StreakNameDecorator
         final String maybeNative = config.showNativeIcon() ? nativeChain : "";
 
         // Canonical order: [#] + OUR + (nativeChain?) + RSN + ":" + typed
-        w.setText(prefix + our + maybeNative + Text.removeTags(rsn) + ":" + parts[1]);
+        chatboxInputWidget.setText(prefix + our + maybeNative + Text.removeTags(rsn) + ":" + parts[1]);
     }
 
     private void maybeFlipActive()
