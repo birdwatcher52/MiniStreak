@@ -7,6 +7,7 @@ import net.runelite.api.Client;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ScriptCallbackEvent;
+import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.InterfaceID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
@@ -34,7 +35,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public final class StreakNameDecorator
 {
-    private static final int CHATBOX_INPUT_CHILD_ID = 0x00A2_0038;
+    private static final int CHATBOX_INPUT_CHILD_ID = ComponentID.CHATBOX_INPUT & 0xFFFF;
 
     private static final Set<ChatMessageType> DECORATED_TYPES = EnumSet.of(
             ChatMessageType.PUBLICCHAT,
